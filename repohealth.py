@@ -7,9 +7,10 @@ import pathlib
 import yaml
 
 def check_common_files():
-    common_dir = os.path.abspath(os.getenv('COMMON_DIR', 'common'))
 
-    print(f"[\033[90m INFO \033[0m] check_common_files {common_dir} \t{res}")
+    common_dir = os.path.abspath(os.getenv('COMMON_DIR', os.path.join(os.path.dirname(os.path.realpath(__file__)), 'common-files')))
+
+    print(f"[\033[90m INFO \033[0m] check_common_files {common_dir}")
 
     match_files = pathlib.Path(os.path.join(common_dir)).glob('**/match.yml')
 
