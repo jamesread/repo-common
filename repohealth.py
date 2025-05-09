@@ -6,8 +6,8 @@ import re
 import pathlib
 import yaml
 
-def check_common_files():
 
+def check_common_files():
     common_dir = os.path.abspath(os.getenv('COMMON_DIR', os.path.join(os.path.dirname(os.path.realpath(__file__)), 'common-files')))
 
     print(f"[\033[90m INFO \033[0m] check_common_files {common_dir}")
@@ -41,33 +41,39 @@ def check_common_files_base(dir_name):
 
     print(f"\t\tChecking common files in {dir_name}")
 
-    for file in files:
-        if not file.exists():
-            print(f"\t\t[\033[91mFAILED\033[0m] {file} does not exist")
+    for comm_file in files:
+        repo_file = pathlib.Path(str(comm_file.absolute()).replace(dir_name, os.getcwd()))
+
+        if dir_name == str(comm_file):
             continue
 
-        if file.is_dir():
-            print(f"\t\t[\033[90m SKIP \033[0m] dir {file.name}")
+        print("")
+        print(f"\t\trepo_file: {repo_file}")
+        print(f"\t\tcomm_file: {comm_file}")
+
+        if "match.yml" in repo_file.name:
+            print(f"\t\t[\033[90m SKIP \033[0m] cfg {repo_file.name}")
             continue
 
-        if "match.yml" in file.name:
-            print(f"\t\t[\033[90m SKIP \033[0m] cfg {file.name}")
+        if not repo_file.exists():
+            print(f"\t\t[\033[91mFAILED\033[0m] {repo_file} does not exist")
             continue
 
-        repo_filename = os.path.abspath(file)
-        common_filename = os.path.abspath(os.path.join(dir_name, file))
+        if comm_file.is_dir():
+            print(f"\t\t[\033[90m SKIP \033[0m] dir {comm_file.name}")
+            continue
 
-        repo_file_checksum = os.popen(f'sha256sum {repo_filename}').read().split()[0]
-        common_file_checksum = os.popen(f'sha256sum {common_filename}').read().split()[0]
+        repo_file_checksum = os.popen(f'sha256sum {repo_file}').read().split()[0]
+        comm_file_checksum = os.popen(f'sha256sum {comm_file}').read().split()[0]
 
-
-        if repo_file_checksum == common_file_checksum:
-            print(f"\t\t[\033[32m  OK  \033[0m] file checksum match: {repo_filename}")
+        if repo_file_checksum == comm_file_checksum:
+            print(f"\t\t[\033[32m  OK  \033[0m] file checksum match, repo: {repo_file}")
+            print(f"\t\t[\033[32m  OK  \033[0m] file checksum match, comm: {comm_file}")
         else:
             print(f"\t\t[\033[91mFAILED\033[0m] file checksum does not match")
-            print(f"\t\t[\033[91mFAILED\033[0m] repo_filename: {repo_filename}")
-            print(f"\t\t[\033[91mFAILED\033[0m] common_filename: {common_filename}")
-            print(f"\t\t[\033[91mFAILED\033[0m] vimdiff {repo_filename} {common_filename}")
+            print(f"\t\t[\033[91mFAILED\033[0m] repo_file: {repo_file}")
+            print(f"\t\t[\033[91mFAILED\033[0m] comm_file: {comm_file}")
+            print(f"\t\t[\033[91mFAILED\033[0m] vimdiff {repo_file} {comm_file}")
 
 
 def get_topics():
@@ -191,9 +197,25 @@ def check_issue_templates_exist():
 
 def check_precommit_exists():
     if os.path.exists('.pre-commit-config.yaml'):
+        run_check(check_conventional_commits)
+
         return True
 
     return "Pre-commit config not found"
+
+def filename_contains_line(filename, line):
+    with open(filename, 'r') as f:
+        for file_line in f:
+            if line in file_line:
+                return True
+
+    return False
+
+def check_conventional_commits():
+    if filename_contains_line('.pre-commit-config.yaml', 'repo: https://github.com/compilerla/conventional-pre-commit'):
+        return True
+
+    return "Pre-commit config missing conventional commit"
 
 def check_community_health():
     if os.getenv("OFFLINE") != "":
@@ -222,6 +244,14 @@ def check_community_health():
     else:
         return "Community health not found"
 
+def run_check(check):
+    res = check()
+
+    if res != True:
+        print(f"[\033[91mFAILED\033[0m] {check.__name__}\t{res}")
+    else:
+        print(f"[\033[32m  OK  \033[0m] {check.__name__}")
+
 checks = [
     check_maturity_label,
     check_logo_exists,
@@ -235,9 +265,4 @@ checks = [
 ]
 
 for check in checks:
-    res = check()
-
-    if res != True:
-        print(f"[\033[91mFAILED\033[0m] {check.__name__}\t{res}")
-    else:
-        print(f"[\033[32m  OK  \033[0m] {check.__name__}")
+    res = run_check(check)
