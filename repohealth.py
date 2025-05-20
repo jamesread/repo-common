@@ -5,17 +5,46 @@ import json
 import re
 import pathlib
 import yaml
+import configargparse
+
+parser = configargparse.ArgParser()
+parser.add_argument('--show-skipped', action = 'store_true', help = 'Show skipped tests')
+global args
+args = parser.parse_args()
+
+
+class TestOutput():
+    output = ""
+    test_name = ""
+
+    def __init__(self, test_name):
+        self.test_name = test_name
+
+    def info(self, msg):
+        self.output += f"\t {msg}\n"
+
+    def suggest(self, msg):
+        self.output += f"\t \033[93mSUGGEST\033[0m: {msg}\n"
+
+    def fail(self, msg):
+        print(f"[\033[91mFAILED\033[0m] {self.test_name}: {msg}")
+        print(self.output)
+
+    def skip(self, msg):
+        if args.show_skipped:
+            print(f"[\033[90m SKIP \033[0m] {self.test_name}: {msg}")
+            print(self.output)
 
 
 def check_common_files():
     common_dir = os.path.abspath(os.getenv('COMMON_DIR', os.path.join(os.path.dirname(os.path.realpath(__file__)), 'common-files')))
 
-    print(f"[\033[90m INFO \033[0m] check_common_files {common_dir}")
+    #print(f"[\033[90m INFO \033[0m] check_common_files {common_dir}")
 
     match_files = pathlib.Path(os.path.join(common_dir)).glob('**/match.yml')
 
     for match_file in match_files:
-        print(f"\tFound match.yaml file: {match_file}")
+        #print(f"\tFound match.yaml file: {match_file}")
 
         dir_name = os.path.dirname(match_file)
 
@@ -23,13 +52,13 @@ def check_common_files():
         match_rules = open(match_file, 'r').read()
         match_rules = yaml.safe_load(match_rules)
 
-        print(f"\tChecking {match_file} to see if it matches")
+        #print(f"\tChecking {match_file} to see if it matches")
 
         for filename_rule in match_rules:
             exists = os.path.exists(filename_rule)
 
             if exists:
-                print(f"\tMatched filename rule: {filename_rule} in {dir_name}")
+                #print(f"\tMatched filename rule: {filename_rule} in {dir_name}")
                 check_common_files_base(dir_name)
                 break
 
@@ -39,41 +68,42 @@ def check_common_files():
 def check_common_files_base(dir_name):
     files = pathlib.Path(dir_name).glob('**')
 
-    print(f"\t\tChecking common files in {dir_name}")
+    #print(f"\t\tChecking common files in {dir_name}")
 
     for comm_file in files:
+        output = TestOutput("check_common_files")
+
         repo_file = pathlib.Path(str(comm_file.absolute()).replace(dir_name, os.getcwd()))
 
         if dir_name == str(comm_file):
             continue
 
-        print("")
-        print(f"\t\trepo_file: {repo_file}")
-        print(f"\t\tcomm_file: {comm_file}")
+
+        output.info(f"repo_file: {repo_file}")
+        output.info(f"comm_file: {comm_file}")
 
         if "match.yml" in repo_file.name:
-            print(f"\t\t[\033[90m SKIP \033[0m] cfg {repo_file.name}")
+            output.skip(f"{repo_file.name} skipped becaused it's a match.yml file")
             continue
 
         if not repo_file.exists():
-            print(f"\t\t[\033[91mFAILED\033[0m] {repo_file} does not exist")
+            output.fail(f"repo_file {repo_file.name} does not exist")
             continue
 
         if comm_file.is_dir():
-            print(f"\t\t[\033[90m SKIP \033[0m] dir {comm_file.name}")
+            output.skip(f"dir {comm_file.name}")
             continue
 
         repo_file_checksum = os.popen(f'sha256sum {repo_file}').read().split()[0]
         comm_file_checksum = os.popen(f'sha256sum {comm_file}').read().split()[0]
 
         if repo_file_checksum == comm_file_checksum:
-            print(f"\t\t[\033[32m  OK  \033[0m] file checksum match, repo: {repo_file}")
-            print(f"\t\t[\033[32m  OK  \033[0m] file checksum match, comm: {comm_file}")
+            output.info(f"file checksum match, repo: {repo_file}")
+            output.info(f"file checksum match, comm: {comm_file}")
         else:
-            print(f"\t\t[\033[91mFAILED\033[0m] file checksum does not match")
-            print(f"\t\t[\033[91mFAILED\033[0m] repo_file: {repo_file}")
-            print(f"\t\t[\033[91mFAILED\033[0m] comm_file: {comm_file}")
-            print(f"\t\t[\033[91mFAILED\033[0m] vimdiff {repo_file} {comm_file}")
+            output.suggest(f"vimdiff {repo_file} {comm_file}")
+            output.suggest(f"cp {repo_file} {comm_file}")
+            output.fail(f"file checksum does not match {comm_file}")
 
 
 def get_topics():
@@ -218,7 +248,7 @@ def check_conventional_commits():
     return "Pre-commit config missing conventional commit"
 
 def check_community_health():
-    if os.getenv("OFFLINE") != "":
+    if os.getenv("OFFLINE") is not None:
         return "Offline mode"
 
     repo_url = os.popen('git remote get-url origin ').read()
@@ -244,13 +274,15 @@ def check_community_health():
     else:
         return "Community health not found"
 
+
 def run_check(check):
     res = check()
 
-    if res != True:
+    if res is not True:
         print(f"[\033[91mFAILED\033[0m] {check.__name__}\t{res}")
     else:
         print(f"[\033[32m  OK  \033[0m] {check.__name__}")
+
 
 checks = [
     check_maturity_label,
