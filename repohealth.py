@@ -87,6 +87,7 @@ def check_common_files_base(dir_name):
             continue
 
         if not repo_file.exists():
+            output.suggest(f"cp {comm_file} {repo_file}")
             output.fail(f"repo_file {repo_file.name} does not exist")
             continue
 
@@ -102,7 +103,7 @@ def check_common_files_base(dir_name):
             output.info(f"file checksum match, comm: {comm_file}")
         else:
             output.suggest(f"vimdiff {repo_file} {comm_file}")
-            output.suggest(f"cp {repo_file} {comm_file}")
+            output.suggest(f"cp {comm_file} {repo_file}")
             output.fail(f"file checksum does not match {comm_file}")
 
 
