@@ -1,0 +1,2 @@
+[console_scripts]
+repo-helper = repo_helper.cli:main

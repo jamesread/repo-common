@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: repo-helper
+Version: 0.1.0
+Summary: CLI utilities for repo-common: health checks and screenshots
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: configargparse
+Requires-Dist: Pillow
+Requires-Dist: PyYAML
+Requires-Dist: selenium
+Requires-Dist: webdriver-manager
+
+# repo-common
